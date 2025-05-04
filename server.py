@@ -2,10 +2,7 @@
 import socket
 import threading
 import json
-import time
-import re
 import traceback
-from collections import defaultdict
 
 class Server:
     def __init__(self, port, config_file):

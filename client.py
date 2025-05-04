@@ -5,7 +5,6 @@ import time
 import threading
 import sys
 import traceback
-from collections import defaultdict
 
 INF = float('inf')
 
