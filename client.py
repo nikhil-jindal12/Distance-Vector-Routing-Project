@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import socket
 import json
 import time
@@ -21,6 +22,7 @@ class Router:
         self.stable_cycles = 0
         self.cycle_count = 0
         self.lock = threading.Lock()
+        self.has_printed = False  # Track if we've printed the final table
         
     def join_network(self):
         """Send JOIN message to server"""
@@ -147,18 +149,29 @@ class Router:
     def run(self):
         """Main client loop"""
         try:
+            # Add staggered start based on router ID to avoid output collision
+            router_order = {'u': 0, 'v': 1, 'w': 2, 'x': 3, 'y': 4, 'z': 5}
+            if self.router_id in router_order:
+                start_delay = router_order[self.router_id] * 0.5
+                time.sleep(start_delay)
+            
             # Join the network
             self.join_network()
             self.wait_for_neighbors()
             self.initialize_dv()
-            self.send_update()
             
-            # Start receiving thread
+            # Start receiving thread immediately
             receive_thread = threading.Thread(target=self.receive_updates)
             receive_thread.daemon = True
             receive_thread.start()
             
-            # Main loop for DV algorithm
+            # Wait a moment for all routers to join
+            time.sleep(2)
+            
+            # Send initial update
+            self.send_update()
+            
+            # Main loop - send periodic updates and check convergence
             while self.running:
                 time.sleep(1)
                 
@@ -166,10 +179,22 @@ class Router:
                     self.cycle_count += 1
                     self.stable_cycles += 1
                     
+                    # Send periodic updates to help slow joiners
+                    if self.cycle_count % 3 == 0:  # Send every 3 cycles
+                        self.send_update()
+                    
                     # Check if algorithm has converged
-                    if self.stable_cycles >= 8:
+                    if self.stable_cycles >= 10 and not self.has_printed:
+                        # Add staggered output based on router ID
+                        output_delay = router_order.get(self.router_id, 0) * 1.5  # 1.5 seconds between outputs
+                        time.sleep(output_delay)
+                        
                         print(f"\nAlgorithm converged for {self.router_id} after {self.cycle_count} cycles")
                         self.print_forwarding_table()
+                        self.has_printed = True
+                    
+                    # Continue running for a while to help late joiners
+                    if self.has_printed and self.cycle_count >= 40:
                         self.running = False
                         break
         except Exception as e:
@@ -180,21 +205,30 @@ class Router:
     
     def receive_updates(self):
         """Thread to receive updates from server"""
+        # Set socket to non-blocking
+        self.sock.setblocking(False)
+        
         while self.running:
             try:
+                # Check for incoming messages
                 data, _ = self.sock.recvfrom(4096)
                 message = json.loads(data.decode())
                 
                 if message.get('type') == 'UPDATE':
                     from_id = message.get('from')
                     neighbor_dv = message.get('dv', {})
+                    print(f"Router {self.router_id}: Received UPDATE from {from_id}")
                     
                     with self.lock:
                         self.process_update(from_id, neighbor_dv)
+            except BlockingIOError:
+                # No data available, continue
+                time.sleep(0.1)
             except Exception as e:
                 if self.running:
                     print(f"Error receiving update in {self.router_id}: {e}")
                     traceback.print_exc()
+                    time.sleep(0.5)  # Prevent tight error loop
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:

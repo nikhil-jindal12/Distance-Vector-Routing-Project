@@ -39,18 +39,17 @@ echo "Server started with PID: $SERVER_PID"
 # Wait for server to start
 sleep 2
 
-# Start all routers
+# Start all routers simultaneously
 declare -a routers=("u" "x" "w" "v" "y" "z")
 
-echo "Starting routers..."
+echo "Starting routers simultaneously..."
 for router in "${routers[@]}"; do
     echo "Starting router $router..."
     python3 client.py "$router" localhost 5555 &
     echo "Router $router started with PID: $!"
-    sleep 1
 done
 
-echo "All routers started. Press Ctrl+C to stop all processes."
+echo "All routers started simultaneously. Press Ctrl+C to stop all processes."
 
 # Keep script running
 while true; do
