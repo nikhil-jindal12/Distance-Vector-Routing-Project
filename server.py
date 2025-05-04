@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import socket
 import threading
 import json
@@ -26,27 +27,30 @@ class Server:
                     if line.startswith('#') or not line:
                         continue
                     
-                    parts = line.split()
+                    router_id = line[0]
+                    parts = line[1:].split('>, ')
                     if not parts:
                         continue
                         
-                    router_id = parts[0]
+                    # router_id = parts[0]
                     neighbors = []
                     
-                    # Parse <node, cost> pairs
-                    for i in range(1, len(parts)):
-                        match = re.match(r'<([a-z]), (-?\d+)>', parts[i])
-                        if match:
-                            node, cost = match.groups()
-                            cost = int(cost)
-                            if cost != -1:  # Only add connected neighbors
-                                neighbors.append((node, cost))
+                    # Parse <node, cost> pairs - each might end with a comma
+                    for i in range(len(parts)):
+                        # Remove trailing comma if present and brackets
+                        pair_str = parts[i].strip().rstrip(',').lstrip('<').rstrip('>')
+                        nodecost = pair_str.split(', ')
+                        node = nodecost[0]
+                        cost = int(nodecost[1])
+                        if cost != -1:  # Only add connected neighbors
+                            neighbors.append((node, cost))
                     
                     self.router_info[router_id] = {
                         'neighbors': neighbors,
                         'ip': '',
                         'port': 0
                     }
+                    print(f"Loaded {router_id}: {neighbors}")  # Debug line
             print(f"Loaded topology for routers: {list(self.router_info.keys())}")
         except Exception as e:
             print(f"Error loading config file: {e}")
@@ -67,8 +71,11 @@ class Server:
             self.router_info[router_id]['ip'] = client_addr[0]
             self.router_info[router_id]['port'] = client_addr[1]
             
-            # Send neighbor information back
+            # Get neighbor information
             neighbors = self.router_info[router_id]['neighbors']
+            print(f"Router {router_id} has neighbors: {neighbors}")  # Debug line
+            
+            # Send neighbor information back
             response = {
                 'type': 'NEIGHBORS',
                 'neighbors': neighbors

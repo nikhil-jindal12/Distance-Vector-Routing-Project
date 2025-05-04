@@ -167,7 +167,7 @@ class Router:
                     self.stable_cycles += 1
                     
                     # Check if algorithm has converged
-                    if self.stable_cycles >= 3:
+                    if self.stable_cycles >= 8:
                         print(f"\nAlgorithm converged for {self.router_id} after {self.cycle_count} cycles")
                         self.print_forwarding_table()
                         self.running = False
